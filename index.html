@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的投资大管家 - V10.1 云端安全版</title>
+    <title>我的投资大管家 - V10.2 真脉络版</title>
     <style>
         * { box-sizing: border-box; }
         body { font-family: system-ui, -apple-system, sans-serif; background-color: #000000; margin: 0; padding: 0; color: #ffffff; padding-bottom: 40px;}
@@ -151,7 +151,6 @@
     </div>
 
     <script>
-        // 🔒 终极安全防线：从本地存储获取 API 密钥，代码绝对纯净
         function getApiKey() {
             let key = localStorage.getItem('gemini_api_key_v10');
             if (!key) {
@@ -196,20 +195,41 @@
             }
         }
 
+        // 🌟 V10.2 升级：双节点智能轮询引擎
         async function fetchYahooFinanceData() {
             const btn = document.getElementById('syncBtn');
             const statusText = document.getElementById('syncStatus');
-            btn.innerText = "抓取中..."; btn.style.opacity = "0.7";
+            btn.innerText = "数据抓取中..."; btn.style.opacity = "0.7";
             const symbols = Object.values(yahooSymbolMap).join(',');
             const targetUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}`;
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+            
+            // 部署两个不同的公共代理节点，防止单点故障
+            const proxies = [
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`
+            ];
+
+            let success = false;
+            let data = null;
+
+            // 智能轮询机制：一个不通，立刻尝试下一个
+            for (let proxy of proxies) {
+                try {
+                    const response = await fetch(proxy);
+                    if (response.ok) {
+                        data = await response.json();
+                        success = true;
+                        break; // 获取成功，跳出循环
+                    }
+                } catch (e) {
+                    console.log("代理节点切换中...");
+                }
+            }
 
             try {
-                const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error("代理受阻");
-                const data = await response.json();
-                const quotes = data.quoteResponse.result;
+                if (!success || !data || !data.quoteResponse) throw new Error("所有免费代理节点暂时堵塞");
 
+                const quotes = data.quoteResponse.result;
                 quotes.forEach(quote => {
                     let localSymbol = Object.keys(yahooSymbolMap).find(key => yahooSymbolMap[key] === quote.symbol);
                     if (localSymbol && appState.stocks[localSymbol]) {
@@ -220,13 +240,14 @@
                     }
                 });
                 appState.isOnline = true;
-                statusText.innerHTML = `📡 状态：<span style="color:#4ade80">已连接 Yahoo Finance</span>`;
+                statusText.innerHTML = `📡 状态：<span style="color:#4ade80">已连接 Yahoo Finance (实时行情)</span>`;
             } catch (error) {
+                // 如果极其倒霉两个节点都挂了，才会触发仿真数据
                 appState.stocks['PBBANK'].currentPrice = 5.15; appState.stocks['PBBANK'].pe = "11.60"; appState.stocks['PBBANK'].pb = "1.28";
                 appState.stocks['INARI'].currentPrice = 3.35; appState.stocks['INARI'].pe = "37.2"; appState.stocks['INARI'].pb = "4.65";
                 appState.stocks['S&P 500'].currentPrice = 512.50; appState.stocks['S&P 500'].pe = "24.5"; appState.stocks['S&P 500'].pb = "4.25";
                 appState.isOnline = true;
-                statusText.innerHTML = `📡 状态：<span style="color:#c084fc">已启动仿真引擎</span>`;
+                statusText.innerHTML = `📡 状态：<span style="color:#c084fc">已启动仿真引擎 (网络暂时受限)</span>`;
             }
             btn.innerText = "重新获取"; btn.style.opacity = "1";
             recalculateAndRender();
@@ -323,7 +344,6 @@
             const input = document.getElementById('tradeInput').value.trim();
             if(!input) return;
 
-            // 🌟 获取本地存储的 API Key
             const activeApiKey = getApiKey();
             if (!activeApiKey) return;
 
@@ -343,7 +363,6 @@
             `;
 
             try {
-                // 调用最强的 gemini-2.5-flash 模型
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${activeApiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
