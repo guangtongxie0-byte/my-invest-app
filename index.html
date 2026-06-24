@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的投资大管家 - V10.4 纯血真实版</title>
+    <title>我的投资大管家 - V10.5 动态财务版</title>
     <style>
         * { box-sizing: border-box; }
         body { font-family: system-ui, -apple-system, sans-serif; background-color: #000000; margin: 0; padding: 0; color: #ffffff; padding-bottom: 40px;}
@@ -167,16 +167,18 @@
             alert("✅ 本地保存的 API 钥匙已清除。下次使用 AI 时将要求重新输入。");
         }
         
+        // 可将 VOO 替换为 SXR8.DE 或 CSPX.L
         const yahooSymbolMap = { 'PBBANK': '1295.KL', 'INARI': '0166.KL', 'S&P 500': 'VOO' };
 
+        // 🌟 核心升级：注入公司底层财务基因 (EPS, BVPS, 预期派息)
         const defaultAppState = {
-            cash: 12000,
+            cash: 13000,
             goals: { savings: 100000, dividend: 10000 },
             isOnline: false,
             stocks: {
-                'PBBANK': { name: 'PBBANK', tag: '博弈仓', typeKey: 'spec', tagClass: 'tag-spec', shares: 500, avgCost: 4.80, currentPrice: 5.00, divYield: 0.038, pe: "-", pb: "-", realizedPnL: 0.00, history: [] },
-                'INARI': { name: 'INARI', tag: '趋势仓', typeKey: 'trend', tagClass: 'tag-trend', shares: 4000, avgCost: 3.10, currentPrice: 3.40, divYield: 0.021, pe: "-", pb: "-", realizedPnL: 0.00, history: [] },
-                'S&P 500': { name: 'S&P 500', tag: '压舱石', typeKey: 'ballast', tagClass: 'tag-ballast', shares: 60, avgCost: 480.50, currentPrice: 510.00, divYield: 0.013, pe: "-", pb: "-", realizedPnL: 0.00, history: [] }
+                'PBBANK': { name: 'PBBANK', tag: '博弈仓', typeKey: 'spec', tagClass: 'tag-spec', shares: 500, avgCost: 4.80, currentPrice: 4.85, eps: 0.42, bvps: 3.75, annualDiv: 0.19, realizedPnL: 0.00, history: [] },
+                'INARI': { name: 'INARI', tag: '趋势仓', typeKey: 'trend', tagClass: 'tag-trend', shares: 4000, avgCost: 3.10, currentPrice: 2.18, eps: 0.06, bvps: 0.47, annualDiv: 0.08, realizedPnL: 0.00, history: [] },
+                'S&P 500': { name: 'S&P 500', tag: '压舱石', typeKey: 'ballast', tagClass: 'tag-ballast', shares: 60, avgCost: 480.50, currentPrice: 530.00, eps: 21.50, bvps: 110.00, annualDiv: 6.50, realizedPnL: 0.00, history: [] }
             }
         };
 
@@ -188,14 +190,13 @@
             if (savedData) appState = JSON.parse(savedData);
         }
         function clearLocalData() {
-            if(confirm("确定要清除所有数据，恢复出厂设置吗？")) {
+            if(confirm("确定要清除所有数据，并载入最新的财务基因库吗？")) {
                 localStorage.removeItem('myInvestmentApp_v10');
                 appState = JSON.parse(JSON.stringify(defaultAppState));
                 recalculateAndRender();
             }
         }
 
-        // 🌟 V10.4 升级：坚守底线，只拿真数据，不用假替身！
         async function fetchYahooFinanceData() {
             const btn = document.getElementById('syncBtn');
             const statusText = document.getElementById('syncStatus');
@@ -206,8 +207,6 @@
 
             for (let key of stockKeys) {
                 let symbol = yahooSymbolMap[key];
-                
-                // 核心破解：放弃被封锁的 v7 quote，改走雅虎完全敞开的 v8 chart 接口
                 const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`;
                 const proxyUrl = `https://my-yahoo-proxy.guangtongxie0.workers.dev/?url=${encodeURIComponent(targetUrl)}`;
 
@@ -215,7 +214,6 @@
                     const response = await fetch(proxyUrl);
                     if (response.ok) {
                         const data = await response.json();
-                        // 从 chart 结构里提取精准市价
                         const meta = data.chart.result[0].meta;
                         appState.stocks[key].currentPrice = meta.regularMarketPrice;
                         successCount++;
@@ -225,13 +223,12 @@
                 }
             }
 
-            // 彻底移除玩具数据，只做真实反馈
             if (successCount > 0) {
                 appState.isOnline = true;
                 statusText.innerHTML = `📡 状态：<span style="color:#4ade80">已连接真实市价 (雅虎 v8 通道)</span>`;
             } else {
                 appState.isOnline = false;
-                statusText.innerHTML = `📡 状态：<span style="color:#ef4444">连接失败，请稍后重试（绝不使用假数据）</span>`;
+                statusText.innerHTML = `📡 状态：<span style="color:#ef4444">连接失败，请稍后重试</span>`;
             }
             
             btn.innerText = "重新获取"; btn.style.opacity = "1";
@@ -253,23 +250,20 @@
 
                 if (stock.shares > 0) {
                     totalStockValue += marketValue;
-                    totalDividendIncome += (stock.shares * priceInRM * stock.divYield);
+                    
+                    // 🌟 动态计算实时股息率和年收入
+                    let currentDivYield = (stock.annualDiv / stock.currentPrice) * 100;
+                    totalDividendIncome += (stock.shares * stock.annualDiv * (isUSD ? 4.5 : 1));
+
                     if (stock.typeKey === 'ballast') ballastValue += marketValue;
                     if (stock.typeKey === 'trend') trendValue += marketValue;
                     if (stock.typeKey === 'spec') specValue += marketValue;
 
-                    let mktPE = parseFloat(stock.pe);
-                    let mktPB = parseFloat(stock.pb);
-                    let myPE = "-", myPB = "-";
-                    
-                    if (!isNaN(mktPE) && mktPE > 0) {
-                        let eps = stock.currentPrice / mktPE;
-                        myPE = (stock.avgCost / eps).toFixed(2);
-                    }
-                    if (!isNaN(mktPB) && mktPB > 0) {
-                        let bvps = stock.currentPrice / mktPB;
-                        myPB = (stock.avgCost / bvps).toFixed(2);
-                    }
+                    // 🌟 动态实时计算市场估值与持仓估值
+                    let mktPE = stock.eps ? (stock.currentPrice / stock.eps).toFixed(2) : "-";
+                    let myPE = stock.eps ? (stock.avgCost / stock.eps).toFixed(2) : "-";
+                    let mktPB = stock.bvps ? (stock.currentPrice / stock.bvps).toFixed(2) : "-";
+                    let myPB = stock.bvps ? (stock.avgCost / stock.bvps).toFixed(2) : "-";
 
                     const card = document.createElement('div'); card.className = 'card';
                     card.setAttribute('onclick', `openModal('${stock.name}')`);
@@ -286,18 +280,18 @@
                         </div>
                         <div class="stats-grid">
                             <div class="stat-item"><span class="stat-label">最新持股</span><span class="stat-value">${stock.shares}</span></div>
-                            <div class="stat-item"><span class="stat-label">股息率</span><span class="stat-value">${(stock.divYield * 100).toFixed(1)}%</span></div>
+                            <div class="stat-item"><span class="stat-label">实时股息率</span><span class="stat-value ${dataClass}">${currentDivYield.toFixed(1)}%</span></div>
                             
                             <div class="stat-item"><span class="stat-label">均价 / 市价</span>
                                 <span class="dual-value"><span class="my-val">${isUSD?'$':'RM'}${stock.avgCost.toFixed(2)}</span> / <span class="mkt-val ${dataClass}">${isUSD?'$':'RM'}${stock.currentPrice.toFixed(2)}</span></span>
                             </div>
                             
                             <div class="stat-item"><span class="stat-label">持仓 / 市场 P/E</span>
-                                <span class="dual-value"><span class="my-val">${myPE}</span> / <span class="mkt-val">-</span></span>
+                                <span class="dual-value"><span class="my-val">${myPE}</span> / <span class="mkt-val ${dataClass}">${mktPE}</span></span>
                             </div>
 
                             <div class="stat-item"><span class="stat-label">持仓 / 市场 P/B</span>
-                                <span class="dual-value"><span class="my-val">${myPB}</span> / <span class="mkt-val">-</span></span>
+                                <span class="dual-value"><span class="my-val">${myPB}</span> / <span class="mkt-val ${dataClass}">${mktPB}</span></span>
                             </div>
                         </div>
                     `;
