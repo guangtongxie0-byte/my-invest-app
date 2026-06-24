@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的投资大管家 - V10.3 专属直通车版</title>
+    <title>我的投资大管家 - V10.4 纯血真实版</title>
     <style>
         * { box-sizing: border-box; }
         body { font-family: system-ui, -apple-system, sans-serif; background-color: #000000; margin: 0; padding: 0; color: #ffffff; padding-bottom: 40px;}
@@ -53,7 +53,7 @@
         .stat-item { display: flex; flex-direction: column; gap: 4px; }
         .stat-label { font-size: 11px; color: #8c9ba5; }
         .stat-value { font-size: 14px; font-weight: 600; }
-        .highlight-data { color: #c084fc; font-weight: 800; }
+        .highlight-data { color: #4ade80; font-weight: 800; }
         .dual-value { font-size: 13px; font-family: monospace; }
         .my-val { color: #f472b6; } 
         .mkt-val { color: #38bdf8; } 
@@ -124,7 +124,7 @@
 
         <div class="sync-banner">
             <span id="syncStatus">📡 状态：读取本地缓存数据</span>
-            <button class="sync-btn" id="syncBtn" onclick="fetchYahooFinanceData()">获取 Yahoo 行情</button>
+            <button class="sync-btn" id="syncBtn" onclick="fetchYahooFinanceData()">获取真实行情</button>
         </div>
 
         <div id="portfolioContainer"></div>
@@ -195,57 +195,45 @@
             }
         }
 
-        // 🌟 V10.3 升级：专属私人数据桥梁
+        // 🌟 V10.4 升级：坚守底线，只拿真数据，不用假替身！
         async function fetchYahooFinanceData() {
             const btn = document.getElementById('syncBtn');
             const statusText = document.getElementById('syncStatus');
-            btn.innerText = "数据抓取中..."; btn.style.opacity = "0.7";
-            const symbols = Object.values(yahooSymbolMap).join(',');
-            const targetUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}`;
-            
-            // 使用你亲手搭建的专属私有节点
-            const proxies = [
-                `https://my-yahoo-proxy.guangtongxie0.workers.dev/?url=${encodeURIComponent(targetUrl)}`
-            ];
+            btn.innerText = "获取真实数据中..."; btn.style.opacity = "0.7";
 
-            let success = false;
-            let data = null;
+            let successCount = 0;
+            const stockKeys = Object.keys(appState.stocks);
 
-            for (let proxy of proxies) {
+            for (let key of stockKeys) {
+                let symbol = yahooSymbolMap[key];
+                
+                // 核心破解：放弃被封锁的 v7 quote，改走雅虎完全敞开的 v8 chart 接口
+                const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`;
+                const proxyUrl = `https://my-yahoo-proxy.guangtongxie0.workers.dev/?url=${encodeURIComponent(targetUrl)}`;
+
                 try {
-                    const response = await fetch(proxy);
+                    const response = await fetch(proxyUrl);
                     if (response.ok) {
-                        data = await response.json();
-                        success = true;
-                        break; 
+                        const data = await response.json();
+                        // 从 chart 结构里提取精准市价
+                        const meta = data.chart.result[0].meta;
+                        appState.stocks[key].currentPrice = meta.regularMarketPrice;
+                        successCount++;
                     }
                 } catch (e) {
-                    console.log("专属通道请求失败...");
+                    console.log(key + " 真实数据抓取失败", e);
                 }
             }
 
-            try {
-                if (!success || !data || !data.quoteResponse) throw new Error("代理节点暂时堵塞");
-
-                const quotes = data.quoteResponse.result;
-                quotes.forEach(quote => {
-                    let localSymbol = Object.keys(yahooSymbolMap).find(key => yahooSymbolMap[key] === quote.symbol);
-                    if (localSymbol && appState.stocks[localSymbol]) {
-                        appState.stocks[localSymbol].currentPrice = quote.regularMarketPrice;
-                        appState.stocks[localSymbol].pe = quote.trailingPE ? quote.trailingPE.toFixed(2) : '-';
-                        appState.stocks[localSymbol].pb = quote.priceToBook ? quote.priceToBook.toFixed(2) : '-';
-                        if (quote.trailingAnnualDividendYield) appState.stocks[localSymbol].divYield = quote.trailingAnnualDividendYield;
-                    }
-                });
+            // 彻底移除玩具数据，只做真实反馈
+            if (successCount > 0) {
                 appState.isOnline = true;
-                statusText.innerHTML = `📡 状态：<span style="color:#4ade80">已连接专属通道 (实时行情)</span>`;
-            } catch (error) {
-                appState.stocks['PBBANK'].currentPrice = 5.15; appState.stocks['PBBANK'].pe = "11.60"; appState.stocks['PBBANK'].pb = "1.28";
-                appState.stocks['INARI'].currentPrice = 3.35; appState.stocks['INARI'].pe = "37.2"; appState.stocks['INARI'].pb = "4.65";
-                appState.stocks['S&P 500'].currentPrice = 512.50; appState.stocks['S&P 500'].pe = "24.5"; appState.stocks['S&P 500'].pb = "4.25";
-                appState.isOnline = true;
-                statusText.innerHTML = `📡 状态：<span style="color:#c084fc">已启动仿真引擎 (网络暂时受限)</span>`;
+                statusText.innerHTML = `📡 状态：<span style="color:#4ade80">已连接真实市价 (雅虎 v8 通道)</span>`;
+            } else {
+                appState.isOnline = false;
+                statusText.innerHTML = `📡 状态：<span style="color:#ef4444">连接失败，请稍后重试（绝不使用假数据）</span>`;
             }
+            
             btn.innerText = "重新获取"; btn.style.opacity = "1";
             recalculateAndRender();
         }
@@ -298,18 +286,18 @@
                         </div>
                         <div class="stats-grid">
                             <div class="stat-item"><span class="stat-label">最新持股</span><span class="stat-value">${stock.shares}</span></div>
-                            <div class="stat-item"><span class="stat-label">股息率</span><span class="stat-value ${dataClass}">${(stock.divYield * 100).toFixed(1)}%</span></div>
+                            <div class="stat-item"><span class="stat-label">股息率</span><span class="stat-value">${(stock.divYield * 100).toFixed(1)}%</span></div>
                             
                             <div class="stat-item"><span class="stat-label">均价 / 市价</span>
                                 <span class="dual-value"><span class="my-val">${isUSD?'$':'RM'}${stock.avgCost.toFixed(2)}</span> / <span class="mkt-val ${dataClass}">${isUSD?'$':'RM'}${stock.currentPrice.toFixed(2)}</span></span>
                             </div>
                             
                             <div class="stat-item"><span class="stat-label">持仓 / 市场 P/E</span>
-                                <span class="dual-value"><span class="my-val">${myPE}</span> / <span class="mkt-val ${dataClass}">${stock.pe}</span></span>
+                                <span class="dual-value"><span class="my-val">${myPE}</span> / <span class="mkt-val">-</span></span>
                             </div>
 
                             <div class="stat-item"><span class="stat-label">持仓 / 市场 P/B</span>
-                                <span class="dual-value"><span class="my-val">${myPB}</span> / <span class="mkt-val ${dataClass}">${stock.pb}</span></span>
+                                <span class="dual-value"><span class="my-val">${myPB}</span> / <span class="mkt-val">-</span></span>
                             </div>
                         </div>
                     `;
@@ -434,7 +422,7 @@
             document.getElementById('modalTitle').innerText = symbol + ' 明细流水';
             const historyDiv = document.getElementById('historyList'); historyDiv.innerHTML = '';
             let historyArr = appState.stocks[symbol].history;
-            if(historyArr.length === 0) historyDiv.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">暂无模拟流水记录</div>';
+            if(historyArr.length === 0) historyDiv.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">暂无明细记录</div>';
             else historyArr.forEach(trade => {
                 const item = document.createElement('div'); item.className = 'history-item ' + trade.type;
                 item.innerHTML = `<div class="hist-left"><span class="hist-action">${trade.action} ${trade.qty} 股</span><span class="hist-date">日期: ${trade.date}</span></div><div class="hist-right"><span style="color:${trade.type==='sell'?'#ef4444':'#38bdf8'}">${trade.type==='sell'?'+':'-'}RM ${trade.amount.toFixed(2)}</span><button class="undo-btn" onclick="undoTransaction('${symbol}', ${trade.id})">撤销</button></div>`;
