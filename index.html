@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的投资大管家 - V10.2 真脉络版</title>
+    <title>我的投资大管家 - V10.3 专属直通车版</title>
     <style>
         * { box-sizing: border-box; }
         body { font-family: system-ui, -apple-system, sans-serif; background-color: #000000; margin: 0; padding: 0; color: #ffffff; padding-bottom: 40px;}
@@ -195,7 +195,7 @@
             }
         }
 
-        // 🌟 V10.2 升级：双节点智能轮询引擎
+        // 🌟 V10.3 升级：专属私人数据桥梁
         async function fetchYahooFinanceData() {
             const btn = document.getElementById('syncBtn');
             const statusText = document.getElementById('syncStatus');
@@ -203,31 +203,29 @@
             const symbols = Object.values(yahooSymbolMap).join(',');
             const targetUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}`;
             
-            // 部署两个不同的公共代理节点，防止单点故障
+            // 使用你亲手搭建的专属私有节点
             const proxies = [
-                `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
-                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`
+                `https://my-yahoo-proxy.guangtongxie0.workers.dev/?url=${encodeURIComponent(targetUrl)}`
             ];
 
             let success = false;
             let data = null;
 
-            // 智能轮询机制：一个不通，立刻尝试下一个
             for (let proxy of proxies) {
                 try {
                     const response = await fetch(proxy);
                     if (response.ok) {
                         data = await response.json();
                         success = true;
-                        break; // 获取成功，跳出循环
+                        break; 
                     }
                 } catch (e) {
-                    console.log("代理节点切换中...");
+                    console.log("专属通道请求失败...");
                 }
             }
 
             try {
-                if (!success || !data || !data.quoteResponse) throw new Error("所有免费代理节点暂时堵塞");
+                if (!success || !data || !data.quoteResponse) throw new Error("代理节点暂时堵塞");
 
                 const quotes = data.quoteResponse.result;
                 quotes.forEach(quote => {
@@ -240,9 +238,8 @@
                     }
                 });
                 appState.isOnline = true;
-                statusText.innerHTML = `📡 状态：<span style="color:#4ade80">已连接 Yahoo Finance (实时行情)</span>`;
+                statusText.innerHTML = `📡 状态：<span style="color:#4ade80">已连接专属通道 (实时行情)</span>`;
             } catch (error) {
-                // 如果极其倒霉两个节点都挂了，才会触发仿真数据
                 appState.stocks['PBBANK'].currentPrice = 5.15; appState.stocks['PBBANK'].pe = "11.60"; appState.stocks['PBBANK'].pb = "1.28";
                 appState.stocks['INARI'].currentPrice = 3.35; appState.stocks['INARI'].pe = "37.2"; appState.stocks['INARI'].pb = "4.65";
                 appState.stocks['S&P 500'].currentPrice = 512.50; appState.stocks['S&P 500'].pe = "24.5"; appState.stocks['S&P 500'].pb = "4.25";
